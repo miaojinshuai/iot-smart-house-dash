@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物联网智能小屋 · 云端数据看板</title>
+<style>
+  :root {
+    --bg0: #05070f;
+    --bg1: #0a1020;
+    --card: rgba(16, 24, 48, 0.72);
+    --card-border: rgba(56, 189, 248, 0.22);
+    --cyan: #22d3ee;
+    --cyan-soft: rgba(34, 211, 238, 0.12);
+    --violet: #8b5cf6;
+    --violet-soft: rgba(139, 92, 246, 0.14);
+    --text: #e6f1ff;
+    --text-dim: #8aa0c0;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(1100px 500px at 85% -10%, rgba(139,92,246,0.16), transparent 60%),
+      radial-gradient(900px 480px at 0% 0%, rgba(34,211,238,0.14), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1) 55%, #070b18);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* 科技感网格背景 */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(56,189,248,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,189,248,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 75%);
+  }
+
+  /* ===== 登录页 ===== */
+  #login-view {
+    position: relative; z-index: 1;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .login-box {
+    width: 380px; padding: 38px 36px 30px;
+    background: linear-gradient(165deg, rgba(20,30,60,0.9), rgba(10,16,34,0.92));
+    border: 1px solid var(--card-border); border-radius: 18px;
+    box-shadow: 0 0 40px rgba(34,211,238,0.12), 0 24px 60px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    text-align: center;
+  }
+  .login-logo {
+    width: 74px; height: 74px; margin: 0 auto 18px; border-radius: 20px;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; box-shadow: 0 0 28px rgba(34,211,238,0.35);
+  }
+  .login-box h1 { font-size: 22px; letter-spacing: 2px; margin-bottom: 6px; }
+  .login-box .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 26px; }
+  .field { margin-bottom: 16px; text-align: left; }
+  .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 11px 14px; border-radius: 10px;
+    border: 1px solid rgba(56,189,248,0.25); background: rgba(5,10,24,0.7);
+    color: var(--text); font-size: 14px; outline: none; transition: border .2s;
+  }
+  .field input:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(34,211,238,0.2); }
+  .btn {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: linear-gradient(90deg, #0ea5e9, #7c3aed);
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    letter-spacing: 4px; transition: filter .2s, transform .1s;
+  }
+  .btn:hover { filter: brightness(1.15); }
+  .btn:active { transform: scale(0.98); }
+  .login-err { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+  /* ===== 主界面 ===== */
+  #main-view { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 18px 22px 40px; display: none; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; margin-bottom: 18px;
+    background: linear-gradient(120deg, rgba(15,23,46,0.85), rgba(20,30,58,0.7));
+    border: 1px solid var(--card-border); border-radius: var(--radius);
+    backdrop-filter: blur(8px);
+  }
+  .topbar .title { display: flex; align-items: center; gap: 12px; }
+  .topbar .title .ico {
+    width: 40px; height: 40px; border-radius: 12px; font-size: 20px;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .topbar h1 { font-size: 18px; letter-spacing: 1px; }
+  .topbar .sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .top-right { display: flex; align-items: center; gap: 14px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 999px; font-size: 12px;
+    border: 1px solid rgba(52,211,153,0.4); color: var(--ok); background: rgba(52,211,153,0.08);
+  }
+  .status-pill.off { border-color: rgba(248,113,113,0.4); color: var(--danger); background: rgba(248,113,113,0.08); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .logout-btn {
+    padding: 7px 16px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(138,160,192,0.35); background: transparent; color: var(--text-dim);
+    font-size: 13px; transition: all .2s;
+  }
+  .logout-btn:hover { color: var(--danger); border-color: rgba(248,113,113,0.5); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    padding: 16px; position: relative; overflow: hidden;
+    backdrop-filter: blur(6px); transition: transform .15s, border-color .2s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: rgba(56,189,248,0.45); }
+  .card .label { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .card .value { font-size: 26px; font-weight: 700; margin-top: 8px; letter-spacing: 1px; }
+  .card .unit { font-size: 14px; font-weight: 400; color: var(--text-dim); margin-left: 3px; }
+  .card .hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .card::after {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
+    opacity: .7;
+  }
+  .card.hot .value { color: var(--danger); }
+  .card.cold .value { color: var(--cyan); }
+  .card.on .value { color: var(--ok); }
+  .card.rain-on .value { color: var(--warn); }
+  .card.human-on .value { color: var(--violet); }
+
+  .row2 { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; margin-bottom: 18px; }
+  .row2 .card { padding: 18px; }
+  .card h3 { font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .card h3::before { content: ""; width: 4px; height: 15px; border-radius: 2px; background: linear-gradient(var(--cyan), var(--violet)); }
+  .card-body { max-height: 380px; overflow-y: auto; }
+  .card-body::-webkit-scrollbar { width: 5px; }
+  .card-body::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.3); border-radius: 3px; }
+
+  /* 曲线 */
+  #chart { width: 100%; height: 250px; display: block; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  /* 报警 */
+  .alert-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 9px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px;
+    background: rgba(5,10,24,0.5); border-left: 3px solid var(--text-dim);
+  }
+  .alert-item.danger { border-left-color: var(--danger); }
+  .alert-item.warning { border-left-color: var(--warn); }
+  .alert-item.info { border-left-color: var(--cyan); }
+  .alert-item .time { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+
+  /* AI 管家 */
+  .ai-hero {
+    background: linear-gradient(135deg, rgba(34,211,238,0.10), rgba(139,92,246,0.14));
+    border: 1px solid rgba(139,92,246,0.35);
+  }
+  .ai-msg { font-size: 14px; line-height: 1.7; color: #dbe9ff; }
+  .ai-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(56,189,248,0.35); color: var(--cyan); background: var(--cyan-soft);
+    transition: all .2s;
+  }
+  .chip:hover { background: rgba(34,211,238,0.22); }
+  .chat-box { margin-top: 14px; }
+  .chat-log { height: 190px; overflow-y: auto; padding: 10px; border-radius: 10px; background: rgba(5,10,24,0.55); margin-bottom: 10px; }
+  .chat-log::-webkit-scrollbar { width: 5px; }
+  .chat-log::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.3); border-radius: 3px; }
+  .bubble { margin-bottom: 10px; max-width: 85%; padding: 9px 13px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+  .bubble.user { margin-left: auto; background: linear-gradient(120deg, #0e7490, #6d28d9); color: #fff; }
+  .bubble.ai { background: rgba(15,23,46,0.9); border: 1px solid rgba(56,189,248,0.2); color: #dbe9ff; }
+  .chat-input { display: flex; gap: 8px; }
+  .chat-input input {
+    flex: 1; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid rgba(56,189,248,0.25); background: rgba(5,10,24,0.7);
+    color: var(--text); font-size: 13px; outline: none;
+  }
+  .chat-input input:focus { border-color: var(--cyan); }
+  .chat-input button {
+    padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(90deg, #0ea5e9, #7c3aed); color: #fff; font-size: 13px;
+  }
+
+  /* 配置 */
+  .cfg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  .cfg-item label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .cfg-item input {
+    width: 100%; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid rgba(56,189,248,0.25); background: rgba(5,10,24,0.7);
+    color: var(--text); font-size: 13px; outline: none;
+  }
+
+  /* 调试面板 */
+  .debug-toggle { font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none; }
+  .debug-toggle:hover { color: var(--cyan); }
+  #debug-panel { display: none; margin-top: 10px; }
+  .dps-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dps-table th, .dps-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(56,189,248,0.12); }
+  .dps-table th { color: var(--text-dim); font-weight: 400; }
+  .dps-table td:first-child { font-family: Consolas, monospace; color: var(--cyan); }
+  .dps-table td:last-child { font-family: Consolas, monospace; color: #c4b5fd; word-break: break-all; }
+
+  .tips-list { list-style: none; }
+  .tips-list li { padding: 7px 0; font-size: 13px; color: #cfe3ff; border-bottom: 1px dashed rgba(56,189,248,0.14); }
+  .tips-list li:last-child { border-bottom: none; }
+  .tips-list li::before { content: "◆"; color: var(--cyan); margin-right: 8px; font-size: 10px; }
+
+  .foot { text-align: center; color: rgba(138,160,192,0.6); font-size: 12px; margin-top: 26px; }
+  @media (max-width: 900px) { .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- ===== 登录页 ===== -->
+<div id="login-view">
+  <div class="login-box">
+    <div class="login-logo">🏠</div>
+    <h1>物联网智能小屋</h1>
+    <div class="sub">云端数据看板 · Cloud Dashboard</div>
+    <div class="field">
+      <label>账号</label>
+      <input id="in-user" type="text" value="admin" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="in-pass" type="password" placeholder="请输入密码" autocomplete="current-password">
+    </div>
+    <button class="btn" onclick="doLogin()">登 录</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ===== 主界面 ===== -->
+<div id="main-view">
+  <div class="topbar">
+    <div class="title">
+      <div class="ico">🏠</div>
+      <div>
+        <h1>物联网智能小屋 · 云端数据看板</h1>
+        <div class="sub">涂鸦云 IoT · Arduino Mega 2560 · 豆包 AI 管家</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="status-pill" id="online-pill"><span class="dot"></span><span id="online-txt">连接中</span></span>
+      <button class="logout-btn" onclick="doLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <!-- 数据卡片 -->
+  <div class="grid" id="cards"></div>
+
+  <div class="row2">
+    <!-- 左侧：历史曲线 + 报警 -->
+    <div class="card">
+      <h3>温湿度历史曲线（最近 60 分钟）</h3>
+      <svg id="chart" viewBox="0 0 720 250" preserveAspectRatio="none"></svg>
+      <div class="legend">
+        <span><i style="background:#22d3ee"></i>温度 ℃</span>
+        <span><i style="background:#a78bfa"></i>湿度 %RH</span>
+      </div>
+      <div style="margin-top:14px;">
+        <h3 style="margin-bottom:8px;">实时报警</h3>
+        <div class="card-body" id="alerts" style="max-height:180px;"></div>
+      </div>
+    </div>
+
+    <!-- 右侧：AI 管家 -->
+    <div class="card ai-hero">
+      <h3>🤖 豆包 AI 管家</h3>
+      <div class="ai-msg" id="ai-greet">正在初始化…</div>
+      <div class="ai-chips">
+        <span class="chip" onclick="askAI('今天穿什么衣服？')">👕 穿衣建议</span>
+        <span class="chip" onclick="askAI('现在适合开窗吗？')">🪟 开窗建议</span>
+        <span class="chip" onclick="askAI('小屋现在状态怎么样？')">🏠 小屋状态</span>
+        <span class="chip" onclick="askAI('下雨了吗？')">🌧 天气询问</span>
+      </div>
+      <div class="chat-box">
+        <div class="chat-log" id="chat-log"></div>
+        <div class="chat-input">
+          <input id="chat-input" placeholder="问问豆包 AI 管家…" onkeydown="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row2">
+    <!-- 生活贴士 -->
+    <div class="card">
+      <h3>💡 AI 智能生活贴士</h3>
+      <ul class="tips-list" id="tips"></ul>
+    </div>
+    <!-- 阈值配置 -->
+    <div class="card">
+      <h3>⚙️ 报警阈值设置</h3>
+      <div class="cfg-row">
+        <div class="cfg-item"><label>温度下限（℃）</label><input id="cfg-tmin" type="number" step="0.5"></div>
+        <div class="cfg-item"><label>温度上限（℃）</label><input id="cfg-tmax" type="number" step="0.5"></div>
+        <div class="cfg-item"><label>湿度下限（%）</label><input id="cfg-hmin" type="number" step="1"></div>
+        <div class="cfg-item"><label>湿度上限（%）</label><input id="cfg-hmax" type="number" step="1"></div>
+      </div>
+      <button class="btn" style="padding:9px; font-size:13px; letter-spacing:2px;" onclick="saveCfg()">保存阈值</button>
+      <div style="margin-top:14px;">
+        <span class="debug-toggle" onclick="toggleDebug()">▸ 全部数据调试面板（点击展开：查看每个功能码的最新值，核对 DP 编号用）</span>
+        <div id="debug-panel">
+          <table class="dps-table"><thead><tr><th>功能码 code</th><th>最新值 value</th></tr></thead><tbody id="dps-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">物联网智能小屋 · 第四届无锡市大学生创新创意创业精英赛 创新主赛道参赛作品</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtTime = ts => {
+  const d = new Date(ts);
+  return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2);
+};
+
+/* ===== 登录 ===== */
+async function doLogin() {
+  const user = $("in-user").value.trim();
+  const pass = $("in-pass").value;
+  try {
+    const r = await fetch("/api/login", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password: pass }) });
+    const j = await r.json();
+    if (j.ok) {
+      $("login-view").style.display = "none";
+      $("main-view").style.display = "block";
+      init();
+    } else {
+      $("login-err").textContent = "账号或密码错误";
+    }
+  } catch (e) {
+    $("login-err").textContent = "无法连接服务器，请确认看板已启动";
+  }
+}
+async function doLogout() {
+  await fetch("/api/logout", { method: "POST" });
+  location.reload();
+}
+
+/* ===== 主流程 ===== */
+let cfg = { temp_min: 16, temp_max: 32, hum_min: 30, hum_max: 80 };
+
+function init() {
+  loadCfg();
+  refresh();
+  setInterval(refresh, 10000);
+}
+
+async function refresh() {
+  try {
+    const [cur, hist, alerts, ai] = await Promise.all([
+      fetch("/api/current").then(r => r.json()),
+      fetch("/api/history").then(r => r.json()),
+      fetch("/api/alerts").then(r => r.json()),
+      fetch("/api/ai").then(r => r.json()),
+    ]);
+    renderCards(cur);
+    renderChart(hist);
+    renderAlerts(alerts);
+    renderAI(ai, cur);
+    renderDps(cur.dps || {});
+    // 在线状态
+    const pill = $("online-pill");
+    if (cur.online) { pill.classList.remove("off"); $("online-txt").textContent = "涂鸦云在线"; }
+    else { pill.classList.add("off"); $("online-txt").textContent = "设备离线"; }
+  } catch (e) { /* 未登录或网络错误 */ }
+}
+
+function renderCards(c) {
+  const t = c.temp, h = c.hum;
+  const tClass = t === null ? "" : (t > cfg.temp_max ? "hot" : (t < cfg.temp_min ? "cold" : ""));
+  const hClass = h === null ? "" : (h > cfg.hum_max ? "hot" : (h < cfg.hum_min ? "cold" : ""));
+  const on = v => (v === true || v === 1) ? "on" : "";
+  const txt = v => (v === true || v === 1) ? "开启" : (v === false || v === 0) ? "关闭" : "未知";
+
+  const cards = [
+    { label: "🌡 室内温度", value: t === null ? "--" : t.toFixed(1), unit: "℃", cls: tClass,
+      hint: "上限 " + cfg.temp_max + "℃ / 下限 " + cfg.temp_min + "℃" },
+    { label: "💧 室内湿度", value: h === null ? "--" : Math.round(h), unit: "%RH", cls: hClass,
+      hint: "上限 " + cfg.hum_max + "% / 下限 " + cfg.hum_min + "%" },
+    { label: "🌧 下雨检测", value: c.rain ? "下雨中" : "未下雨", unit: "", cls: c.rain ? "rain-on" : "",
+      hint: "雨滴传感器 A3" },
+    { label: "🚶 门口感应", value: c.human ? "有人通过" : "无人", unit: "", cls: c.human ? "human-on" : "",
+      hint: "人体红外 PIR" },
+    { label: "💡 总灯", value: txt(c.switch_led), unit: "", cls: on(c.switch_led), hint: "switch_led (DP 20)" },
+    { label: "🔆 副灯 1", value: txt(c.switch_led_1), unit: "", cls: on(c.switch_led_1), hint: "switch_led_1 (DP 106)" },
+    { label: "🔅 副灯 2", value: txt(c.switch_led_2), unit: "", cls: on(c.switch_led_2), hint: "switch_led_2 (DP 107)" },
+    { label: "🔒 门锁", value: txt(c.dps && c.dps.lock_switch), unit: "", cls: on(c.dps && c.dps.lock_switch), hint: "lock_switch" },
+  ];
+  $("cards").innerHTML = cards.map(x => `
+    <div class="card ${x.cls}">
+      <div class="label">${x.label}</div>
+      <div class="value">${x.value}<span class="unit">${x.unit}</span></div>
+      <div class="hint">${x.hint}</div>
+    </div>`).join("");
+}
+
+function renderChart(hist) {
+  const svg = $("chart");
+  const W = 720, H = 250, padL = 46, padR = 14, padT = 14, padB = 28;
+  const data = hist.slice(-60);
+  if (data.length < 2) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#8aa0c0" font-size="13" text-anchor="middle">等待数据采集…（每 10 秒一条）</text>`;
+    return;
+  }
+  const ts = data.map(d => d.ts);
+  const temps = data.map(d => d.temp);
+  const hums = data.map(d => d.hum);
+  const allT = temps.filter(v => v !== null && v !== undefined);
+  const allH = hums.filter(v => v !== null && v !== undefined);
+  let tMin = Math.min(...allT), tMax = Math.max(...allT);
+  let hMin = Math.min(...allH), hMax = Math.max(...allH);
+  if (allT.length === 0) { tMin = 0; tMax = 40; }
+  if (allH.length === 0) { hMin = 0; hMax = 100; }
+  if (tMax - tMin < 2) { tMax += 1; tMin -= 1; }
+  if (hMax - hMin < 5) { hMax += 3; hMin -= 2; }
+  const x = i => padL + (i / (data.length - 1)) * (W - padL - padR);
+  const yT = v => padT + (1 - (v - tMin) / (tMax - tMin)) * (H - padT - padB);
+  const yH = v => padT + (1 - (v - hMin) / (hMax - hMin)) * (H - padT - padB);
+
+  let grid = "", tLabels = "", hLabels = "";
+  for (let i = 0; i <= 4; i++) {
+    const gy = padT + (H - padT - padB) * i / 4;
+    grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="rgba(56,189,248,0.08)"/>`;
+    tLabels += `<text x="${padL - 8}" y="${gy + 4}" fill="#8aa0c0" font-size="10" text-anchor="end">${(tMax - (tMax - tMin) * i / 4).toFixed(1)}</text>`;
+    hLabels += `<text x="${W - padR + 10}" y="${gy + 4}" fill="#a78bfa" font-size="10">${Math.round(hMax - (hMax - hMin) * i / 4)}</text>`;
+  }
+  // 时间轴（均匀取样 5 个点）
+  const tIdx = [0, Math.floor((data.length - 1) / 4), Math.floor(2 * (data.length - 1) / 4), Math.floor(3 * (data.length - 1) / 4), data.length - 1];
+  let timeLabels = "";
+  tIdx.forEach((idx, k) => {
+    const tx = x(idx);
+    timeLabels += `<text x="${tx}" y="${H - 8}" fill="#8aa0c0" font-size="10" text-anchor="middle">${fmtTime(ts[idx])}</text>`;
+  });
+
+  const line = (vals, yFn) => {
+    let d = "";
+    vals.forEach((v, i) => {
+      if (v === null || v === undefined) return;
+      d += (d ? " L" : "M") + x(i).toFixed(1) + " " + yFn(v).toFixed(1);
+    });
+    return d;
+  };
+  const tPath = line(temps, yT);
+  const hPath = line(hums, yH);
+  const areaT = tPath ? tPath + ` L${x(data.length - 1)} ${H - padB} L${x(0)} ${H - padB} Z` : "";
+
+  svg.innerHTML = grid + tLabels + hLabels + timeLabels +
+    (areaT ? `<path d="${areaT}" fill="rgba(34,211,238,0.08)"/>` : "") +
+    (tPath ? `<path d="${tPath}" fill="none" stroke="#22d3ee" stroke-width="2"/>` : "") +
+    (hPath ? `<path d="${hPath}" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="5 3"/>` : "");
+}
+
+function renderAlerts(alerts) {
+  const box = $("alerts");
+  if (!alerts.length) {
+    box.innerHTML = `<div style="color:#8aa0c0;font-size:13px;padding:8px;">暂无报警，小屋一切正常 ✅</div>`;
+    return;
+  }
+  box.innerHTML = [...alerts].reverse().map(a => `
+    <div class="alert-item ${a.level}">
+      <div>${a.msg}</div>
+      <div class="time">${fmtTime(a.ts)}</div>
+    </div>`).join("");
+}
+
+function renderAI(ai, cur) {
+  $("ai-greet").textContent = ai.greet;
+  $("tips").innerHTML = (ai.life || []).map(t => `<li>${t}</li>`).join("") || "<li>数据采集中…</li>";
+  if (cur && cur.temp !== null && cur.temp !== undefined) {
+    // 顶部播报区附加穿衣指数
+    $("ai-greet").textContent = ai.greet + " ｜ " + ai.dressing;
+  }
+}
+
+function renderDps(dps) {
+  const keys = Object.keys(dps);
+  if (!keys.length) {
+    $("dps-body").innerHTML = `<tr><td colspan="2" style="color:#8aa0c0;">暂无 DP 数据（等待涂鸦云返回）</td></tr>`;
+    return;
+  }
+  $("dps-body").innerHTML = keys.map(k =>
+    `<tr><td>${k}</td><td>${typeof dps[k] === "object" ? JSON.stringify(dps[k]) : dps[k]}</td></tr>`).join("");
+}
+
+function toggleDebug() {
+  const p = $("debug-panel");
+  p.style.display = p.style.display === "none" ? "block" : "none";
+}
+
+/* ===== 配置 ===== */
+async function loadCfg() {
+  try {
+    const r = await fetch("/api/config");
+    cfg = await r.json();
+    $("cfg-tmin").value = cfg.temp_min;
+    $("cfg-tmax").value = cfg.temp_max;
+    $("cfg-hmin").value = cfg.hum_min;
+    $("cfg-hmax").value = cfg.hum_max;
+  } catch (e) {}
+}
+async function saveCfg() {
+  const body = {
+    temp_min: parseFloat($("cfg-tmin").value),
+    temp_max: parseFloat($("cfg-tmax").value),
+    hum_min: parseFloat($("cfg-hmin").value),
+    hum_max: parseFloat($("cfg-hmax").value),
+  };
+  const r = await fetch("/api/config", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  cfg = await r.json();
+  refresh();
+}
+
+/* ===== AI 对话 ===== */
+function askAI(q) {
+  $("chat-input").value = q;
+  sendChat();
+}
+async function sendChat() {
+  const input = $("chat-input");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+  const log = $("chat-log");
+  log.innerHTML += `<div class="bubble user">${msg.replace(/</g, "&lt;")}</div>`;
+  log.scrollTop = log.scrollHeight;
+  try {
+    const r = await fetch("/api/ai/chat", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msg }) });
+    const j = await r.json();
+    log.innerHTML += `<div class="bubble ai">${j.reply.replace(/</g, "&lt;")}</div>`;
+  } catch (e) {
+    log.innerHTML += `<div class="bubble ai">连接失败，请稍后再试</div>`;
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+/* 回车登录 */
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && $("login-view").style.display !== "none") doLogin();
+});
+</script>
+</body>
+</html>
